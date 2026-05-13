@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AGV 智能调度系统 - 登录</title>
+    <style>
+        :root {
+            --primary-color: #00d2ff;
+            --bg-dark: #060c21;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-dark);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 动态背景背景光圈 */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(var(--primary-color), #3a7bd5);
+            border-radius: 50%;
+            filter: blur(150px);
+            z-index: -1;
+            animation: move 10s infinite alternate;
+        }
+
+        @keyframes move {
+            from {
+                transform: translate(-150px, -150px);
+            }
+
+            to {
+                transform: translate(150px, 150px);
+            }
+        }
+
+        .login-container {
+            position: relative;
+            width: 400px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            /* 半透明 */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            /* 毛玻璃效果 */
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        /* 顶部装饰线条 */
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        }
+
+        h2 {
+            color: #fff;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            font-weight: 300;
+            text-transform: uppercase;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px 0;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            outline: none;
+            color: #fff;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        .input-group input:focus {
+            border-bottom: 1px solid var(--primary-color);
+            box-shadow: 0 1px 0 0 var(--primary-color);
+        }
+
+        .input-group label {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            transition: 0.3s;
+        }
+
+        /* 输入内容后 Label 上移 */
+        .input-group input:focus~label,
+        .input-group input:valid~label {
+            top: -15px;
+            font-size: 12px;
+            color: var(--primary-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 25px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.4s;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #3a7bd5;
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.7);
+            letter-spacing: 1px;
+        }
+
+        .footer-text {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 12px;
+            margin-top: 25px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-container">
+        <h2>System Login</h2>
+        <div class="input-group">
+            <input type="text" id="username" required>
+            <label>Username</label>
+        </div>
+        <div class="input-group">
+            <input type="password" id="password" required>
+            <label>Password</label>
+        </div>
+        <button onclick="doLogin()">进入系统</button>
+        <div class="footer-text">SECURE ACCESS ONLY</div>
+    </div>
+
+    <script>
+        // 登录逻辑保持不变
+        async function doLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                sessionStorage.setItem('isLogin', 'true');
+                sessionStorage.setItem('userRole', result.role); // 存入角色信息
+
+                alert('欢迎回来，' + result.name);
+
+                // 根据角色跳转
+                if (result.role === 'admin') {
+                    location.href = 'admin.html'; // 管理员登录直接进后台
+                } else {
+                    location.href = 'index.html'; // 普通用户进前端首页
+                }
+            } else {
+                alert(result.message);
+            }
+        }
+    </script>
+</body>
+
+</html>
