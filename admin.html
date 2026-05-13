@@ -129,20 +129,6 @@
             <label>主图 (缩略图)</label>
             <input type="file" id="pImg">
         </div>
-        <div class="row">
-            <label>外形尺寸图</label>
-            <input type="file" id="pDrawing">
-        </div>
-        <div class="row">
-            <label>其他展示图 (多选)</label>
-            <input type="file" id="pOther" multiple>
-        </div>
-
-        <div class="row">
-            <label>案例视频</label>
-            <div id="videoContainer"></div>
-            <button type="button" onclick="addVideo()" style="background:#52c41a; margin-top:5px;">+ 添加视频案例</button>
-        </div>
 
         <hr>
         <button id="submitBtn" onclick="submitData()">发布产品</button>
@@ -160,14 +146,13 @@
             window.location.href = 'login.html';
         }
 
-        let currentEditId = null; // 记录当前编辑的ID
+        let currentEditId = null;
 
         function logout() {
             sessionStorage.clear();
             window.location.href = 'login.html';
         }
 
-        // 2. 参数行管理
         function addParam(key = '', val = '') {
             const div = document.createElement('div');
             div.className = 'param-row';
@@ -179,30 +164,17 @@
             document.getElementById('paramContainer').appendChild(div);
         }
 
-        // 3. 视频行管理
-        function addVideo(name = '', desc = '', isEdit = false) {
-            const div = document.createElement('div');
-            div.className = 'video-item';
-            div.innerHTML = `
-                <div style="flex:1">
-                    <input type="text" class="v-title" placeholder="视频标题" value="${name}">
-                    <input type="text" class="v-desc" placeholder="视频描述" value="${desc}">
-                    <input type="file" class="v-file">
-                    ${isEdit ? '<p style="font-size:12px; color:blue;">编辑模式：如不重新选择视频文件，将保留原视频</p>' : ''}
-                </div>
-                <button type="button" onclick="this.parentElement.remove()" class="delete-btn">删除</button>
-            `;
-            document.getElementById('videoContainer').appendChild(div);
-        }
-
-        // 4. 提交数据（新增或修改）
+        // 2. 提交数据
         async function submitData() {
+            const name = document.getElementById('pName').value;
+            if (!name) return alert('请填写产品名称');
+
             const formData = new FormData();
-            formData.append('name', document.getElementById('pName').value);
+            formData.append('name', name);
             formData.append('price', document.getElementById('pPrice').value);
             formData.append('note', document.getElementById('pNote').value);
 
-            // 处理参数
+            // 参数转为 JSON 字符串
             const params = {};
             document.querySelectorAll('.param-row').forEach(row => {
                 const k = row.querySelector('.p-key').value;
@@ -211,94 +183,70 @@
             });
             formData.append('params', JSON.stringify(params));
 
-            // 处理文件
-            if (document.getElementById('pImg').files[0]) formData.append('img', document.getElementById('pImg').files[0]);
-            if (document.getElementById('pDrawing').files[0]) formData.append('drawing', document.getElementById('pDrawing').files[0]);
-            const otherFiles = document.getElementById('pOther').files;
-            for (let f of otherFiles) formData.append('other', f);
+            // 图片文件 (注意这里字段名改为 image 匹配后端)
+            const imgFile = document.getElementById('pImg').files[0];
+            if (imgFile) formData.append('image', imgFile);
 
-            // 处理视频
-            const videoData = [];
-            document.querySelectorAll('.video-item').forEach(item => {
-                const fileInput = item.querySelector('.v-file');
-                videoData.push({
-                    name: item.querySelector('.v-title').value,
-                    desc: item.querySelector('.v-desc').value,
-                    isNew: !!fileInput.files[0] // 标记是否上传了新视频
-                });
-                if (fileInput.files[0]) {
-                    formData.append('videoFiles', fileInput.files[0]);
+            // 统一使用 POST 接口（如果你后端未写 PUT，建议先用 POST）
+            const url = '/api/products';
+
+            try {
+                const res = await fetch(url, { method: 'POST', body: formData });
+                if (res.ok) {
+                    alert('操作成功！');
+                    location.reload();
+                } else {
+                    const errText = await res.text();
+                    console.error('服务器返回错误:', errText);
+                    alert('发布失败，请检查服务器控制台');
                 }
-            });
-            formData.append('videos', JSON.stringify(videoData));
-
-            const method = currentEditId ? 'PUT' : 'POST';
-            const url = currentEditId ? `/api/products/${currentEditId}` : '/api/products';
-
-            const res = await fetch(url, { method: method, body: formData });
-            const result = await res.json();
-            if (result.success) {
-                alert(currentEditId ? '修改成功！' : '发布成功！');
-                location.reload();
-            } else {
-                alert('操作失败，请检查后端服务。');
+            } catch (err) {
+                console.error('网络请求失败:', err);
+                alert('无法连接到服务器');
             }
         }
 
-        // 5. 加载列表
+        // 3. 加载列表
         async function loadAdminList() {
-            const res = await fetch('/api/products');
-            const list = await res.json();
-            const container = document.getElementById('adminProductList');
-            container.innerHTML = "";
-            list.forEach(p => {
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    <span>${p.name} (¥${p.price})</span>
-                    <div>
-                        <button class="edit-btn" onclick='editProduct(${JSON.stringify(p)})'>编辑</button>
-                        <button class="delete-btn" onclick="deleteProduct('${p._id}')">删除</button>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
+            try {
+                const res = await fetch('/api/products');
+                const list = await res.json();
+                const container = document.getElementById('adminProductList');
+                container.innerHTML = "";
+                list.forEach(p => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <span>${p.name} (¥${p.price || '未定价'})</span>
+                        <div>
+                            <button class="delete-btn" onclick="deleteProduct('${p._id}')">删除</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                console.error("加载列表失败", e);
+            }
         }
 
-        // 6. 进入编辑模式
-        function editProduct(p) {
-            currentEditId = p._id;
-            document.getElementById('formTitle').innerText = "正在修改：" + p.name;
-            document.getElementById('submitBtn').innerText = "保存修改";
-            document.getElementById('cancelBtn').style.display = "inline-block";
+        // 4. 删除功能
+        async function deleteProduct(id) {
+            if (!confirm('确定要删除吗？此操作不可恢复。')) return;
 
-            document.getElementById('pName').value = p.name;
-            document.getElementById('pPrice').value = p.price;
-            document.getElementById('pNote').value = p.note;
-
-            // 回显参数
-            document.getElementById('paramContainer').innerHTML = "";
-            for (let k in p.params) {
-                addParam(k, p.params[k]);
+            try {
+                const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    alert('删除成功');
+                    loadAdminList(); // 刷新列表
+                } else {
+                    alert('删除失败');
+                }
+            } catch (err) {
+                alert('删除请求失败');
             }
-
-            // 回显视频结构
-            document.getElementById('videoContainer').innerHTML = "";
-            if (p.videos) {
-                p.videos.forEach(v => addVideo(v.name, v.desc, true));
-            }
-
-            window.scrollTo(0, 0);
         }
 
         function resetForm() {
             location.reload();
-        }
-
-        async function deleteProduct(id) {
-            if (confirm('确定要彻底删除该产品吗？')) {
-                await fetch(`/api/products/${id}`, { method: 'DELETE' });
-                loadAdminList();
-            }
         }
 
         loadAdminList();
