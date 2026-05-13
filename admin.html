@@ -40,8 +40,7 @@
             border-radius: 4px;
         }
 
-        .param-row,
-        .video-item {
+        .param-row {
             display: flex;
             gap: 10px;
             margin-bottom: 10px;
@@ -57,19 +56,11 @@
             color: white;
             border: none;
             border-radius: 4px;
-            transition: 0.3s;
-        }
-
-        button:hover {
-            background: #16345f;
         }
 
         .delete-btn {
             background: #ff4d4f;
-        }
-
-        .delete-btn:hover {
-            background: #d9363e;
+            margin-left: 5px;
         }
 
         .edit-btn {
@@ -98,7 +89,6 @@
 </head>
 
 <body>
-
     <div style="max-width: 800px; margin: 0 auto 20px; display: flex; justify-content: space-between;">
         <button onclick="location.href='index.html'" style="background: #666;">⬅ 返回首页</button>
         <button onclick="logout()" style="background: #ff4d4f;">安全退出</button>
@@ -106,43 +96,20 @@
 
     <div class="form-section">
         <h2 id="formTitle">发布新产品</h2>
-        <div class="row">
-            <label>产品名称</label>
-            <input type="text" id="pName" placeholder="如：潜伏式AGV">
-        </div>
-        <div class="row">
-            <label>价格</label>
-            <input type="text" id="pPrice" placeholder="如：80000">
-        </div>
-        <div class="row">
-            <label>产品介绍</label>
-            <textarea id="pNote" rows="3"></textarea>
-        </div>
+        <input type="hidden" id="editId">
+        <div class="row"><label>产品名称</label><input type="text" id="pName"></div>
+        <div class="row"><label>价格</label><input type="text" id="pPrice"></div>
+        <div class="row"><label>产品介绍</label><textarea id="pNote" rows="3"></textarea></div>
 
         <div class="row">
             <label>技术参数</label>
             <div id="paramContainer"></div>
-            <button type="button" onclick="addParam()" style="background:#52c41a; margin-top:5px;">+ 添加参数行</button>
+            <button type="button" onclick="addParam()" style="background:#52c41a;">+ 添加参数</button>
         </div>
 
-        <div class="row">
-            <label>主图 (缩略图)</label>
-            <input type="file" id="pImg">
-        </div>
-        <div class="row">
-            <label>外形尺寸图</label>
-            <input type="file" id="pDrawing">
-        </div>
-        <div class="row">
-            <label>其他展示图 (多选)</label>
-            <input type="file" id="pOther" multiple>
-        </div>
-
-        <div class="row">
-            <label>案例视频</label>
-            <div id="videoContainer"></div>
-            <button type="button" onclick="addVideo()" style="background:#52c41a; margin-top:5px;">+ 添加视频案例</button>
-        </div>
+        <div class="row"><label>主图 (缩略图)</label><input type="file" id="pImg"></div>
+        <div class="row"><label>其他展示图片 (可多选)</label><input type="file" id="pOtherImgs" multiple></div>
+        <div class="row"><label>案例视频</label><input type="file" id="pVideo"></div>
 
         <hr>
         <button id="submitBtn" onclick="submitData()">发布产品</button>
@@ -155,40 +122,22 @@
     </div>
 
     <script>
-        // 1. 权限校验
-        if (sessionStorage.getItem('isLogin') !== 'true' || sessionStorage.getItem('userRole') !== 'admin') {
-            window.location.href = 'login.html';
-        }
-
-        let currentEditId = null;
-
-        function logout() {
-            sessionStorage.clear();
-            window.location.href = 'login.html';
-        }
+        if (sessionStorage.getItem('isLogin') !== 'true') window.location.href = 'login.html';
 
         function addParam(key = '', val = '') {
             const div = document.createElement('div');
             div.className = 'param-row';
-            div.innerHTML = `
-                <input type="text" class="p-key" placeholder="参数名" value="${key}">
-                <input type="text" class="p-val" placeholder="数值" value="${val}">
-                <button type="button" onclick="this.parentElement.remove()" class="delete-btn">删除</button>
-            `;
+            div.innerHTML = `<input type="text" class="p-key" placeholder="名" value="${key}"><input type="text" class="p-val" placeholder="值" value="${val}"><button type="button" onclick="this.parentElement.remove()" class="delete-btn">删除</button>`;
             document.getElementById('paramContainer').appendChild(div);
         }
 
-        // 2. 提交数据（发布功能）
         async function submitData() {
-            const name = document.getElementById('pName').value;
-            if (!name) return alert('请填写产品名称');
-
+            const id = document.getElementById('editId').value;
             const formData = new FormData();
-            formData.append('name', name);
+            formData.append('name', document.getElementById('pName').value);
             formData.append('price', document.getElementById('pPrice').value);
             formData.append('note', document.getElementById('pNote').value);
 
-            // 技术参数转 JSON
             const params = {};
             document.querySelectorAll('.param-row').forEach(row => {
                 const k = row.querySelector('.p-key').value;
@@ -197,82 +146,62 @@
             });
             formData.append('params', JSON.stringify(params));
 
-            // 图片文件：【核心修改】字段名从 img 改为 image，匹配后端 upload.single('image')
-            const imgFile = document.getElementById('pImg').files[0];
-            if (imgFile) {
-                formData.append('image', imgFile);
+            // 文件上传对齐后端字段
+            if (document.getElementById('pImg').files[0]) formData.append('image', document.getElementById('pImg').files[0]);
+
+            const otherFiles = document.getElementById('pOtherImgs').files;
+            for (let i = 0; i < otherFiles.length; i++) {
+                formData.append('otherImages', otherFiles[i]);
             }
 
-            try {
-                // 如果是编辑模式，可以走 PUT，如果后端没写 PUT，建议先保持 POST 新增
-                const url = '/api/products';
-                const res = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
+            if (document.getElementById('pVideo').files[0]) formData.append('video', document.getElementById('pVideo').files[0]);
 
-                if (res.ok) {
-                    alert('发布成功！');
-                    location.reload();
-                } else {
-                    const errData = await res.text();
-                    console.error('服务器返回错误:', errData);
-                    alert('发布失败，请检查后端代码。');
-                }
-            } catch (err) {
-                console.error('网络请求失败:', err);
-                alert('无法连接到服务器，请检查网络。');
-            }
+            const url = id ? `/api/products/${id}` : '/api/products';
+            const method = id ? 'PUT' : 'POST';
+
+            const res = await fetch(url, { method, body: formData });
+            if (res.ok) { alert('操作成功'); location.reload(); }
         }
 
-        // 3. 加载产品列表
         async function loadAdminList() {
-            try {
-                const res = await fetch('/api/products');
-                const list = await res.json();
-                const container = document.getElementById('adminProductList');
-                container.innerHTML = "";
-                list.forEach(p => {
-                    const div = document.createElement('div');
-                    div.innerHTML = `
-                        <span>${p.name} (¥${p.price || '未定价'})</span>
-                        <div>
-                            <button class="delete-btn" onclick="deleteProduct('${p._id}')">删除</button>
-                        </div>
-                    `;
-                    container.appendChild(div);
-                });
-            } catch (e) {
-                console.error("加载列表失败", e);
-            }
+            const res = await fetch('/api/products');
+            const list = await res.json();
+            const container = document.getElementById('adminProductList');
+            container.innerHTML = list.map(p => `
+                <div>
+                    <span>${p.name}</span>
+                    <div>
+                        <button class="edit-btn" onclick="editProduct('${p._id}')">编辑</button>
+                        <button class="delete-btn" onclick="deleteProduct('${p._id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        // 4. 删除功能：【核心修改】确保路径正确
+        async function editProduct(id) {
+            const res = await fetch(`/api/products/${id}`);
+            const p = await res.json();
+            document.getElementById('editId').value = p._id;
+            document.getElementById('pName').value = p.name;
+            document.getElementById('pPrice').value = p.price;
+            document.getElementById('pNote').value = p.note;
+            document.getElementById('formTitle').innerText = "编辑产品";
+            document.getElementById('submitBtn').innerText = "保存修改";
+            document.getElementById('cancelBtn').style.display = "inline";
+            document.getElementById('paramContainer').innerHTML = "";
+            for (let k in p.params) addParam(k, p.params[k]);
+            window.scrollTo(0, 0);
+        }
+
         async function deleteProduct(id) {
-            if (!confirm('确定要删除吗？此操作不可恢复。')) return;
-
-            try {
-                const res = await fetch(`/api/products/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (res.ok) {
-                    alert('删除成功');
-                    loadAdminList(); // 刷新列表
-                } else {
-                    alert('删除失败，服务器未响应正确指令。');
-                }
-            } catch (err) {
-                console.error('删除请求出错:', err);
-                alert('删除请求失败');
+            if (confirm('确定删除？')) {
+                await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                loadAdminList();
             }
         }
 
-        function resetForm() {
-            location.reload();
-        }
-
-        // 初始化加载
+        function resetForm() { location.reload(); }
+        function logout() { sessionStorage.clear(); window.location.href = 'login.html'; }
         loadAdminList();
     </script>
 </body>
