@@ -30,20 +30,19 @@ app.get('/', (req, res) => {
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        // 在用户数据库中查找
         const user = await userDb.findOne({ username, password });
-
         if (user) {
+            // 关键点：返回 user.name。如果数据库没设 name，就用 username 代替
             res.json({
                 success: true,
                 role: user.role,
                 name: user.name || username
             });
         } else {
-            res.json({ success: false, message: '账号或密码错误，请联系管理员。' });
+            res.json({ success: false, message: '账号或密码错误' });
         }
     } catch (err) {
-        res.status(500).json({ success: false, message: '服务器内部错误' });
+        res.status(500).json({ success: false, message: '服务器错误' });
     }
 });
 
