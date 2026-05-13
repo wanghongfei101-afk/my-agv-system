@@ -129,6 +129,20 @@
             <label>主图 (缩略图)</label>
             <input type="file" id="pImg">
         </div>
+        <div class="row">
+            <label>外形尺寸图</label>
+            <input type="file" id="pDrawing">
+        </div>
+        <div class="row">
+            <label>其他展示图 (多选)</label>
+            <input type="file" id="pOther" multiple>
+        </div>
+
+        <div class="row">
+            <label>案例视频</label>
+            <div id="videoContainer"></div>
+            <button type="button" onclick="addVideo()" style="background:#52c41a; margin-top:5px;">+ 添加视频案例</button>
+        </div>
 
         <hr>
         <button id="submitBtn" onclick="submitData()">发布产品</button>
