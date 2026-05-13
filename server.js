@@ -4,14 +4,14 @@ const multer = require('multer');
 const nedb = require('nedb-promises');
 
 const app = express();
-// 核心修复：自动适配 Render 的环境端口
 const PORT = process.env.PORT || 10000;
 
-// 1. 数据库初始化 (使用相对路径确保在云端也能创建)
+// 1. 数据库初始化
 const db = nedb.create({ filename: './products.db', autoload: true });
+// 【修复点】必须初始化用户数据库
+const userDb = nedb.create({ filename: './users.db', autoload: true });
 
 // 2. 静态资源托管
-// 无论你的文件是在根目录还是子目录，这行都能确保路径正确
 app.use(express.static(path.join(__dirname, './')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
@@ -19,12 +19,33 @@ app.use('/images', express.static(path.join(__dirname, 'images')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 4. 路由：显式指定根目录返回 index.html
+// 4. 首页路由
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- 以下是 API 接口示例，请确保与你之前的逻辑一致 ---
+// --- API 接口 ---
+
+// 【修复点】新增：处理登录请求
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        // 在用户数据库中查找
+        const user = await userDb.findOne({ username, password });
+
+        if (user) {
+            res.json({
+                success: true,
+                role: user.role,
+                name: user.name || username
+            });
+        } else {
+            res.json({ success: false, message: '账号或密码错误，请联系管理员。' });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, message: '服务器内部错误' });
+    }
+});
 
 // 获取产品列表
 app.get('/api/products', async (req, res) => {
@@ -36,7 +57,7 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-// 获取单个产品
+// 获取单个产品详情
 app.get('/api/products/:id', async (req, res) => {
     try {
         const doc = await db.findOne({ _id: req.params.id });
