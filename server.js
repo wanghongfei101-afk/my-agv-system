@@ -1,165 +1,52 @@
 const express = require('express');
-const multer = require('multer');
 const path = require('path');
-const Datastore = require('nedb-promises');
+const multer = require('multer');
+const nedb = require('nedb-promises');
 
 const app = express();
-const db = Datastore.create({ filename: 'products.db', autoload: true });
-const userDb = Datastore.create({ filename: 'users.db', autoload: true });
+// 核心修复：自动适配 Render 的环境端口
+const PORT = process.env.PORT || 10000;
 
-// --- 中间件配置 (必须放在路由之前) ---
-app.use(express.json()); // 解析 JSON 格式的请求体
-app.use('/images', express.static('images')); // 静态资源目录
-const publicPath = path.join(__dirname, './');
-app.use(express.static(publicPath));
+// 1. 数据库初始化 (使用相对路径确保在云端也能创建)
+const db = nedb.create({ filename: './products.db', autoload: true });
 
-// 显式指定根目录访问 index.html
+// 2. 静态资源托管
+// 无论你的文件是在根目录还是子目录，这行都能确保路径正确
+app.use(express.static(path.join(__dirname, './')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
+// 3. 解析中间件
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 4. 路由：显式指定根目录返回 index.html
 app.get('/', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- 初始化账号逻辑 ---
-async function initUsers() {
-    const admin = await userDb.findOne({ username: 'admin' });
-    if (!admin) {
-        await userDb.insert({
-            username: 'admin',
-            password: 'admin888',
-            name: '系统管理员',
-            role: 'admin'
-        });
-    }
-    const user = await userDb.findOne({ username: 'user' });
-    if (!user) {
-        await userDb.insert({
-            username: 'user',
-            password: 'user123',
-            name: '产品查看员',
-            role: 'user'
-        });
-    }
-}
-initUsers();
+// --- 以下是 API 接口示例，请确保与你之前的逻辑一致 ---
 
-// --- 路由接口 ---
-
-// 1. 登录接口 (保留这一个即可，包含了角色返回)
-app.post('/api/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const user = await userDb.findOne({ username, password });
-        if (user) {
-            res.json({
-                success: true,
-                name: user.name,
-                role: user.role
-            });
-        } else {
-            res.json({ success: false, message: '账号或密码错误' });
-        }
-    } catch (err) {
-        res.status(500).json({ success: false, message: '服务器内部错误' });
-    }
-});
-
-// 2. 产品配置相关
-const storage = multer.diskStorage({
-    destination: 'images/',
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
-    }
-});
-const upload = multer({ storage });
-
-// 获取列表
+// 获取产品列表
 app.get('/api/products', async (req, res) => {
-    const products = await db.find({});
-    res.json(products);
-});
-
-// 获取详情
-app.get('/api/products/:id', async (req, res) => {
-    const product = await db.findOne({ _id: req.params.id });
-    res.json(product);
-});
-
-// 新增产品
-app.post('/api/products', upload.fields([
-    { name: 'img', maxCount: 1 },
-    { name: 'drawing', maxCount: 1 },
-    { name: 'other', maxCount: 10 },
-    { name: 'videoFiles', maxCount: 10 }
-]), async (req, res) => {
     try {
-        const files = req.files;
-        const body = req.body;
-        const newProduct = {
-            name: body.name,
-            price: body.price,
-            note: body.note,
-            params: JSON.parse(body.params),
-            img: files.img ? 'images/' + files.img[0].filename : '',
-            drawing: files.drawing ? 'images/' + files.drawing[0].filename : '',
-            other: files.other ? files.other.map(f => 'images/' + f.filename) : [],
-            videos: JSON.parse(body.videos).map((v, index) => ({
-                name: v.name,
-                desc: v.desc,
-                url: files.videoFiles && files.videoFiles[index] ? 'images/' + files.videoFiles[index].filename : v.url
-            }))
-        };
-        const doc = await db.insert(newProduct);
-        res.json({ success: true, id: doc._id });
-    } catch (e) { res.status(500).json({ success: false }); }
-});
-
-// 更新产品 (PUT)
-app.put('/api/products/:id', upload.fields([
-    { name: 'img', maxCount: 1 },
-    { name: 'drawing', maxCount: 1 },
-    { name: 'other', maxCount: 10 },
-    { name: 'videoFiles', maxCount: 10 }
-]), async (req, res) => {
-    try {
-        const id = req.params.id;
-        const files = req.files;
-        const body = req.body;
-        const oldProduct = await db.findOne({ _id: id });
-        if (!oldProduct) return res.status(404).json({ success: false });
-
-        const updateData = {
-            name: body.name,
-            price: body.price,
-            note: body.note,
-            params: JSON.parse(body.params),
-            img: files.img ? 'images/' + files.img[0].filename : oldProduct.img,
-            drawing: files.drawing ? 'images/' + files.drawing[0].filename : oldProduct.drawing,
-            other: files.other ? files.other.map(f => 'images/' + f.filename) : oldProduct.other,
-        };
-
-        const videoInfo = JSON.parse(body.videos);
-        let videoFileIndex = 0;
-        updateData.videos = videoInfo.map((v) => {
-            // 如果前端标记是新上传的视频文件
-            if (v.isNew && files.videoFiles && files.videoFiles[videoFileIndex]) {
-                const file = files.videoFiles[videoFileIndex++];
-                return { name: v.name, desc: v.desc, url: 'images/' + file.filename };
-            }
-            return v;
-        });
-
-        await db.update({ _id: id }, { $set: updateData });
-        res.json({ success: true });
+        const docs = await db.find({});
+        res.json(docs);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// 删除产品
-app.delete('/api/products/:id', async (req, res) => {
-    await db.remove({ _id: req.params.id });
-    res.json({ success: true });
+// 获取单个产品
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const doc = await db.findOne({ _id: req.params.id });
+        res.json(doc);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`服务启动于端口 ${PORT}`));
+// 5. 启动监听
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`服务已成功启动，正在监听端口: ${PORT}`);
+});
