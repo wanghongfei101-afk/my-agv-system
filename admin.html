@@ -164,7 +164,7 @@
             document.getElementById('paramContainer').appendChild(div);
         }
 
-        // 2. 提交数据
+        // 2. 提交数据（发布功能）
         async function submitData() {
             const name = document.getElementById('pName').value;
             if (!name) return alert('请填写产品名称');
@@ -174,7 +174,7 @@
             formData.append('price', document.getElementById('pPrice').value);
             formData.append('note', document.getElementById('pNote').value);
 
-            // 参数转为 JSON 字符串
+            // 技术参数转 JSON
             const params = {};
             document.querySelectorAll('.param-row').forEach(row => {
                 const k = row.querySelector('.p-key').value;
@@ -183,30 +183,35 @@
             });
             formData.append('params', JSON.stringify(params));
 
-            // 图片文件 (注意这里字段名改为 image 匹配后端)
+            // 图片文件：【核心修改】字段名从 img 改为 image，匹配后端 upload.single('image')
             const imgFile = document.getElementById('pImg').files[0];
-            if (imgFile) formData.append('image', imgFile);
-
-            // 统一使用 POST 接口（如果你后端未写 PUT，建议先用 POST）
-            const url = '/api/products';
+            if (imgFile) {
+                formData.append('image', imgFile);
+            }
 
             try {
-                const res = await fetch(url, { method: 'POST', body: formData });
+                // 如果是编辑模式，可以走 PUT，如果后端没写 PUT，建议先保持 POST 新增
+                const url = '/api/products';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+
                 if (res.ok) {
-                    alert('操作成功！');
+                    alert('发布成功！');
                     location.reload();
                 } else {
-                    const errText = await res.text();
-                    console.error('服务器返回错误:', errText);
-                    alert('发布失败，请检查服务器控制台');
+                    const errData = await res.text();
+                    console.error('服务器返回错误:', errData);
+                    alert('发布失败，请检查后端代码。');
                 }
             } catch (err) {
                 console.error('网络请求失败:', err);
-                alert('无法连接到服务器');
+                alert('无法连接到服务器，请检查网络。');
             }
         }
 
-        // 3. 加载列表
+        // 3. 加载产品列表
         async function loadAdminList() {
             try {
                 const res = await fetch('/api/products');
@@ -228,19 +233,23 @@
             }
         }
 
-        // 4. 删除功能
+        // 4. 删除功能：【核心修改】确保路径正确
         async function deleteProduct(id) {
             if (!confirm('确定要删除吗？此操作不可恢复。')) return;
 
             try {
-                const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                const res = await fetch(`/api/products/${id}`, {
+                    method: 'DELETE'
+                });
+
                 if (res.ok) {
                     alert('删除成功');
                     loadAdminList(); // 刷新列表
                 } else {
-                    alert('删除失败');
+                    alert('删除失败，服务器未响应正确指令。');
                 }
             } catch (err) {
+                console.error('删除请求出错:', err);
                 alert('删除请求失败');
             }
         }
@@ -249,6 +258,7 @@
             location.reload();
         }
 
+        // 初始化加载
         loadAdminList();
     </script>
 </body>
