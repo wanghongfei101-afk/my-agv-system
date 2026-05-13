@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AGV管理后台</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+
+        .form-section {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            margin: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .row {
+            margin-bottom: 15px;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .param-row,
+        .video-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #0b1f3a;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #16345f;
+        }
+
+        .delete-btn {
+            background: #ff4d4f;
+        }
+
+        .delete-btn:hover {
+            background: #d9363e;
+        }
+
+        .edit-btn {
+            background: #1890ff;
+        }
+
+        .cancel-btn {
+            background: #8c8c8c;
+            margin-left: 10px;
+        }
+
+        #adminProductList div {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
+        .list-section {
+            max-width: 800px;
+            margin: 30px auto;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div style="max-width: 800px; margin: 0 auto 20px; display: flex; justify-content: space-between;">
+        <button onclick="location.href='index.html'" style="background: #666;">⬅ 返回首页</button>
+        <button onclick="logout()" style="background: #ff4d4f;">安全退出</button>
+    </div>
+
+    <div class="form-section">
+        <h2 id="formTitle">发布新产品</h2>
+        <div class="row">
+            <label>产品名称</label>
+            <input type="text" id="pName" placeholder="如：潜伏式AGV">
+        </div>
+        <div class="row">
+            <label>价格</label>
+            <input type="text" id="pPrice" placeholder="如：80000">
+        </div>
+        <div class="row">
+            <label>产品介绍</label>
+            <textarea id="pNote" rows="3"></textarea>
+        </div>
+
+        <div class="row">
+            <label>技术参数</label>
+            <div id="paramContainer"></div>
+            <button type="button" onclick="addParam()" style="background:#52c41a; margin-top:5px;">+ 添加参数行</button>
+        </div>
+
+        <div class="row">
+            <label>主图 (缩略图)</label>
+            <input type="file" id="pImg">
+        </div>
+        <div class="row">
+            <label>外形尺寸图</label>
+            <input type="file" id="pDrawing">
+        </div>
+        <div class="row">
+            <label>其他展示图 (多选)</label>
+            <input type="file" id="pOther" multiple>
+        </div>
+
+        <div class="row">
+            <label>案例视频</label>
+            <div id="videoContainer"></div>
+            <button type="button" onclick="addVideo()" style="background:#52c41a; margin-top:5px;">+ 添加视频案例</button>
+        </div>
+
+        <hr>
+        <button id="submitBtn" onclick="submitData()">发布产品</button>
+        <button id="cancelBtn" onclick="resetForm()" class="cancel-btn" style="display:none;">取消编辑</button>
+    </div>
+
+    <div class="list-section">
+        <h3>已发布产品列表</h3>
+        <div id="adminProductList"></div>
+    </div>
+
+    <script>
+        // 1. 权限校验
+        if (sessionStorage.getItem('isLogin') !== 'true' || sessionStorage.getItem('userRole') !== 'admin') {
+            window.location.href = 'login.html';
+        }
+
+        let currentEditId = null; // 记录当前编辑的ID
+
+        function logout() {
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        // 2. 参数行管理
+        function addParam(key = '', val = '') {
+            const div = document.createElement('div');
+            div.className = 'param-row';
+            div.innerHTML = `
+                <input type="text" class="p-key" placeholder="参数名" value="${key}">
+                <input type="text" class="p-val" placeholder="数值" value="${val}">
+                <button type="button" onclick="this.parentElement.remove()" class="delete-btn">删除</button>
+            `;
+            document.getElementById('paramContainer').appendChild(div);
+        }
+
+        // 3. 视频行管理
+        function addVideo(name = '', desc = '', isEdit = false) {
+            const div = document.createElement('div');
+            div.className = 'video-item';
+            div.innerHTML = `
+                <div style="flex:1">
+                    <input type="text" class="v-title" placeholder="视频标题" value="${name}">
+                    <input type="text" class="v-desc" placeholder="视频描述" value="${desc}">
+                    <input type="file" class="v-file">
+                    ${isEdit ? '<p style="font-size:12px; color:blue;">编辑模式：如不重新选择视频文件，将保留原视频</p>' : ''}
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="delete-btn">删除</button>
+            `;
+            document.getElementById('videoContainer').appendChild(div);
+        }
+
+        // 4. 提交数据（新增或修改）
+        async function submitData() {
+            const formData = new FormData();
+            formData.append('name', document.getElementById('pName').value);
+            formData.append('price', document.getElementById('pPrice').value);
+            formData.append('note', document.getElementById('pNote').value);
+
+            // 处理参数
+            const params = {};
+            document.querySelectorAll('.param-row').forEach(row => {
+                const k = row.querySelector('.p-key').value;
+                const v = row.querySelector('.p-val').value;
+                if (k) params[k] = v;
+            });
+            formData.append('params', JSON.stringify(params));
+
+            // 处理文件
+            if (document.getElementById('pImg').files[0]) formData.append('img', document.getElementById('pImg').files[0]);
+            if (document.getElementById('pDrawing').files[0]) formData.append('drawing', document.getElementById('pDrawing').files[0]);
+            const otherFiles = document.getElementById('pOther').files;
+            for (let f of otherFiles) formData.append('other', f);
+
+            // 处理视频
+            const videoData = [];
+            document.querySelectorAll('.video-item').forEach(item => {
+                const fileInput = item.querySelector('.v-file');
+                videoData.push({
+                    name: item.querySelector('.v-title').value,
+                    desc: item.querySelector('.v-desc').value,
+                    isNew: !!fileInput.files[0] // 标记是否上传了新视频
+                });
+                if (fileInput.files[0]) {
+                    formData.append('videoFiles', fileInput.files[0]);
+                }
+            });
+            formData.append('videos', JSON.stringify(videoData));
+
+            const method = currentEditId ? 'PUT' : 'POST';
+            const url = currentEditId ? `/api/products/${currentEditId}` : '/api/products';
+
+            const res = await fetch(url, { method: method, body: formData });
+            const result = await res.json();
+            if (result.success) {
+                alert(currentEditId ? '修改成功！' : '发布成功！');
+                location.reload();
+            } else {
+                alert('操作失败，请检查后端服务。');
+            }
+        }
+
+        // 5. 加载列表
+        async function loadAdminList() {
+            const res = await fetch('/api/products');
+            const list = await res.json();
+            const container = document.getElementById('adminProductList');
+            container.innerHTML = "";
+            list.forEach(p => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <span>${p.name} (¥${p.price})</span>
+                    <div>
+                        <button class="edit-btn" onclick='editProduct(${JSON.stringify(p)})'>编辑</button>
+                        <button class="delete-btn" onclick="deleteProduct('${p._id}')">删除</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // 6. 进入编辑模式
+        function editProduct(p) {
+            currentEditId = p._id;
+            document.getElementById('formTitle').innerText = "正在修改：" + p.name;
+            document.getElementById('submitBtn').innerText = "保存修改";
+            document.getElementById('cancelBtn').style.display = "inline-block";
+
+            document.getElementById('pName').value = p.name;
+            document.getElementById('pPrice').value = p.price;
+            document.getElementById('pNote').value = p.note;
+
+            // 回显参数
+            document.getElementById('paramContainer').innerHTML = "";
+            for (let k in p.params) {
+                addParam(k, p.params[k]);
+            }
+
+            // 回显视频结构
+            document.getElementById('videoContainer').innerHTML = "";
+            if (p.videos) {
+                p.videos.forEach(v => addVideo(v.name, v.desc, true));
+            }
+
+            window.scrollTo(0, 0);
+        }
+
+        function resetForm() {
+            location.reload();
+        }
+
+        async function deleteProduct(id) {
+            if (confirm('确定要彻底删除该产品吗？')) {
+                await fetch(`/api/products/${id}`, { method: 'DELETE' });
+                loadAdminList();
+            }
+        }
+
+        loadAdminList();
+    </script>
+</body>
+
+</html>
