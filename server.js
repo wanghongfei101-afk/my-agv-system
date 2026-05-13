@@ -10,7 +10,13 @@ const userDb = Datastore.create({ filename: 'users.db', autoload: true });
 // --- 中间件配置 (必须放在路由之前) ---
 app.use(express.json()); // 解析 JSON 格式的请求体
 app.use('/images', express.static('images')); // 静态资源目录
-app.use(express.static('./')); // 托管 HTML 文件
+const publicPath = path.join(__dirname, './');
+app.use(express.static(publicPath));
+
+// 显式指定根目录访问 index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(publicPath, 'index.html'));
+});
 
 // --- 初始化账号逻辑 ---
 async function initUsers() {
