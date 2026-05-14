@@ -221,6 +221,29 @@
             transition: color 0.3s ease;
         }
 
+        .card.leaving {
+            transform: scale(1.05) translateY(-10px) !important;
+            /* 缩小位移幅度，减少视觉位移路程 */
+            opacity: 0;
+            filter: blur(4px);
+            /* 减少模糊度，减少显卡计算量 */
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            /* 时间缩短到 0.3s */
+        }
+
+        .container.dim {
+            opacity: 0.85;
+            /* 减少压暗幅度，画面对比度变化越小，视觉压力越轻 */
+            transition: all 0.3s ease;
+        }
+
+        /* 给整个容器加一个淡淡的压暗效果，突出选中的卡片 */
+        .container.dim {
+            opacity: 0.7;
+            filter: grayscale(0.5);
+            transition: all 0.5s ease;
+        }
+
         /* 搜索建议列表样式 */
         .suggestions-box {
             position: absolute;
@@ -306,8 +329,16 @@
                 const div = document.createElement("div");
                 div.className = "card"; // 此处沿用您之前的卡片样式
                 // 修改点击事件
-                div.onclick = () => {
-                    window.location.href = `product.html?id=${p._id}`;
+                div.onclick = (e) => {
+                    // 1. 给容器加压暗效果
+                    container.classList.add('dim');
+                    // 2. 给当前点击的卡片加离场动画
+                    div.classList.add('leaving');
+
+                    // 3. 延迟 400 毫秒后跳转，等待动画播放完毕
+                    setTimeout(() => {
+                        window.location.href = `product.html?id=${p._id}`;
+                    }, 200);
                 };
                 div.innerHTML = `
                     <img src="${p.img || 'images/default.png'}" style="width:100%; height:200px; object-fit:contain; padding:15px;">
